@@ -1,0 +1,6 @@
+node_modules/
+.vscode/
+__tests__/
+src/
+rollup.config.js
+tsconfig.json
