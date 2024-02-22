@@ -22,6 +22,9 @@ const render = hbs({
   extname: '.hbs',
   contentHelperName: 'contentFor',
   blockHelperName: 'block',
+  // helpers: {
+  //   sayhello: name => `Hello, ${name}`,
+  // }
 });
 ```
 
@@ -33,6 +36,7 @@ const render = hbs({
 - {string} <code>extname?</code> Extension for layout and partial templates. Default is `.hbs`&quot;.
 - {string} <code>contentHelperName?</code> Override the &#039;contentFor&#039; helper name used in the template.
 - {string} <code>blockHelperName?</code> Override the &#039;block&#039; helper name used in the template.
+- {{[key: string]: Handlebars.HelperDelegate}} <code>helpers</code> A helper accessible from the template. The key is the helper name and the value is the object that will be the helper function.
 
 #### Return value
 {(filePath: string, data?: object) =&gt; Promise&lt;string&gt;} Returns the render function.

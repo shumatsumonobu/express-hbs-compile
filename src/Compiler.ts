@@ -43,6 +43,11 @@ export default class {
     // Validate options.
     this.#validateOptions(this.#options);
 
+    // Register the helper specified in the option.
+    if (options.helpers)
+      for (let [name, func] of Object.entries(options.helpers))
+        hbs.registerHelper(name, func);
+
     // Create a render instance.
     this.#render = expressHbs.create().express4({
       handlebars: hbs,
@@ -112,6 +117,7 @@ export default class {
       extname: '.hbs',
       contentHelperName: 'contentFor',
       blockHelperName: 'block',
+      helpers: undefined,
     }, options);
 
     // If no partial directory is specified, the default value is set.

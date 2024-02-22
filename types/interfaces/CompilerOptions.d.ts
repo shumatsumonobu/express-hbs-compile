@@ -1,3 +1,4 @@
+import Handlebars from 'handlebars';
 /**
  * Compilation options.
  */
@@ -36,4 +37,10 @@ export default interface CompilerOptions {
      * Override the 'block' helper name used in the template.
      */
     blockHelperName?: string;
+    /**
+     * A helper accessible from the template. The key is the helper name and the value is the object that will be the helper function.
+     */
+    helpers?: {
+        [key: string]: Handlebars.HelperDelegate;
+    };
 }
