@@ -1,6 +1,6 @@
 {
   "name": "express-hbs-compile",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Get HTML string compiled by express-hbs.",
   "main": "dist/build.common.js",
   "module": "dist/build.esm.js",
