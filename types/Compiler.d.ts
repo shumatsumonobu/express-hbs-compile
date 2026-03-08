@@ -1,28 +1,54 @@
-import CompilerOptions from '~/interfaces/CompilerOptions';
+import CompilerOptions from '~/types/CompilerOptions';
 /**
- * express-hbs compiler.
+ * Handlebars template compiler for Express.
+ * Wraps express-hbs to provide a simple async API for compiling Handlebars templates into HTML strings.
+ *
+ * @example
+ * ```typescript
+ * const compiler = new Compiler({
+ *   viewsDir: path.join(__dirname, 'views'),
+ * });
+ *
+ * const html = await compiler.render('index.hbs', {title: 'Home'});
+ * ```
  */
-export default class {
+export default class Compiler {
     #private;
     /**
-     * Initialize compiler.
+     * Creates a new Compiler instance.
      *
      * @param {CompilerOptions} options Compilation options.
-     * @throws {TypeError} Throws an exception if the viewsDir option is unset.
-     * @throws {TypeError} Throws an exception if the directory specified by the viewsDir option is not found.
-     * @throws {TypeError} Throws an exception if the directory specified by the partialsDir option is not found.
-     * @throws {TypeError} Throws an exception if the directory specified by the layoutsDir option is not found.
-     * @throws {TypeError} Throws an exception if the file specified by the defaultLayout option is not found.
+     * @throws {TypeError} If the viewsDir option is not provided.
+     * @throws {TypeError} If the directory specified by viewsDir does not exist.
+     * @throws {TypeError} If the directory specified by partialsDir does not exist.
+     * @throws {TypeError} If the directory specified by layoutsDir does not exist.
+     * @throws {TypeError} If the file specified by defaultLayout does not exist.
      */
     constructor(options: CompilerOptions);
     /**
-     * Get the result of template compilation.
+     * Compiles a Handlebars template and returns the resulting HTML string.
      *
-     * @param {string} template File name or absolute path of the template. If only the file name is specified, the template is searched from the directory specified by the viewsDir option.
-     * @param {object} data? Objects to be expanded on the template. settings, cache, and layout are reserved words and cannot be used as key names for data.
-     * @return {Promise<string>} Compiled HTML string.
-     * @throws {TypeError} Throws an exception if any of the data keys contain reserved words (settings, cache, layout).
-     * @throws {TypeError} Throws an exception if the template file cannot be found.
+     * @param {string} template File name or absolute path of the template.
+     *   If a relative name is given, it is resolved from the viewsDir directory.
+     * @param {object} data Data object whose properties are available in the template.
+     *   Note: `settings`, `cache`, and `layout` are reserved keys and must not be used.
+     * @return {Promise<string>} The compiled HTML string.
+     * @throws {TypeError} If any key in data is a reserved word (settings, cache, layout).
+     * @throws {TypeError} If the template file does not exist.
+     *
+     * @example
+     * ```typescript
+     * // Render with a relative template path (resolved from viewsDir)
+     * const html = await compiler.render('user/profile.hbs', {
+     *   username: 'John',
+     *   isAdmin: true,
+     * });
+     *
+     * // Render with an absolute template path
+     * const html = await compiler.render(path.join(__dirname, 'views/email/welcome.hbs'), {
+     *   recipientName: 'John',
+     * });
+     * ```
      */
     render(template: string, data?: object): Promise<string>;
 }

@@ -1,55 +1,62 @@
 import path from 'path';
 import fs from 'fs';
 import hbs from 'handlebars-extd';
-import {merge} from 'deep-fusion';
-import CompilerOptions from '~/interfaces/CompilerOptions';
 import expressHbs from 'express-hbs';
-// const expressHbs = require('express-hbs');
+import CompilerOptions from '~/types/CompilerOptions';
 
 /**
- * express-hbs compiler.
+ * Handlebars template compiler for Express.
+ * Wraps express-hbs to provide a simple async API for compiling Handlebars templates into HTML strings.
+ *
+ * @example
+ * ```typescript
+ * const compiler = new Compiler({
+ *   viewsDir: path.join(__dirname, 'views'),
+ * });
+ *
+ * const html = await compiler.render('index.hbs', {title: 'Home'});
+ * ```
  */
-export default class {
+export default class Compiler {
   /**
-   * Render Instance.
-   * @type {ExpressHbs.prototype.___express}
+   * Express-hbs rendering function bound to the configured engine instance.
+   * @type {Function}
    */
-  #render: any;
+  #engine: any;
 
   /**
-   * Compilation options.
-   * @type {ExpressHbs.prototype.___express}
+   * Resolved compilation options with all defaults applied.
+   * @type {Required<CompilerOptions>}
    */
   #options: Required<CompilerOptions>;
 
   /**
-   * Initialize compiler.
+   * Creates a new Compiler instance.
    *
    * @param {CompilerOptions} options Compilation options.
-   * @throws {TypeError} Throws an exception if the viewsDir option is unset.
-   * @throws {TypeError} Throws an exception if the directory specified by the viewsDir option is not found.
-   * @throws {TypeError} Throws an exception if the directory specified by the partialsDir option is not found.
-   * @throws {TypeError} Throws an exception if the directory specified by the layoutsDir option is not found.
-   * @throws {TypeError} Throws an exception if the file specified by the defaultLayout option is not found.
+   * @throws {TypeError} If the viewsDir option is not provided.
+   * @throws {TypeError} If the directory specified by viewsDir does not exist.
+   * @throws {TypeError} If the directory specified by partialsDir does not exist.
+   * @throws {TypeError} If the directory specified by layoutsDir does not exist.
+   * @throws {TypeError} If the file specified by defaultLayout does not exist.
    */
   constructor(options: CompilerOptions) {
-    // If the viewsDir option is not entered, an error is returned.
     if (!options.viewsDir)
       throw new TypeError('The viewsDir option is required');
 
-    // Initialize options.
-    this.#options = this.#initOptions(options);
+    // Apply default values to unspecified options.
+    this.#options = this.#applyDefaults(options);
 
-    // Validate options.
+    // Validate that all referenced paths exist.
     this.#validateOptions(this.#options);
 
-    // Register the helper specified in the option.
+    // Register custom Handlebars helpers if provided.
     if (options.helpers)
       for (let [name, func] of Object.entries(options.helpers))
         hbs.registerHelper(name, func);
 
-    // Create a render instance.
-    this.#render = expressHbs.create().express4({
+    // Initialize the express-hbs rendering engine.
+    this.#engine = expressHbs.create().express4({
       handlebars: hbs,
       viewsDir: this.#options.viewsDir,
       partialsDir: this.#options.partialsDir,
@@ -62,55 +69,71 @@ export default class {
   }
 
   /**
-   * Get the result of template compilation.
+   * Compiles a Handlebars template and returns the resulting HTML string.
    *
-   * @param {string} template File name or absolute path of the template. If only the file name is specified, the template is searched from the directory specified by the viewsDir option.
-   * @param {object} data? Objects to be expanded on the template. settings, cache, and layout are reserved words and cannot be used as key names for data.
-   * @return {Promise<string>} Compiled HTML string.
-   * @throws {TypeError} Throws an exception if any of the data keys contain reserved words (settings, cache, layout).
-   * @throws {TypeError} Throws an exception if the template file cannot be found.
+   * @param {string} template File name or absolute path of the template.
+   *   If a relative name is given, it is resolved from the viewsDir directory.
+   * @param {object} data Data object whose properties are available in the template.
+   *   Note: `settings`, `cache`, and `layout` are reserved keys and must not be used.
+   * @return {Promise<string>} The compiled HTML string.
+   * @throws {TypeError} If any key in data is a reserved word (settings, cache, layout).
+   * @throws {TypeError} If the template file does not exist.
+   *
+   * @example
+   * ```typescript
+   * // Render with a relative template path (resolved from viewsDir)
+   * const html = await compiler.render('user/profile.hbs', {
+   *   username: 'John',
+   *   isAdmin: true,
+   * });
+   *
+   * // Render with an absolute template path
+   * const html = await compiler.render(path.join(__dirname, 'views/email/welcome.hbs'), {
+   *   recipientName: 'John',
+   * });
+   * ```
    */
   async render(template: string, data?: object): Promise<string> {
-    return new Promise<string>((resolve, rejetct) => {
-      // If a reserved word (settings, cache, layout) is present in the data key, an error is returned.
+    return new Promise<string>((resolve, reject) => {
+      // Reject if data contains reserved keys used internally by express-hbs.
       if (data) {
-        const reservedWords = ['settings', 'cache', 'layout'];
-        for (let key of reservedWords)
+        const reservedKeys = ['settings', 'cache', 'layout'];
+        for (let key of reservedKeys)
           if (data.hasOwnProperty(key))
-            return void rejetct(new TypeError('Cannot use reserved words (settings, cache, layout) as data keys'));
+            return void reject(new TypeError('Cannot use reserved words (settings, cache, layout) as data keys'));
       }
 
-      // If the template is a file name only, convert it to an absolute path.
+      // Resolve relative template names to absolute paths using viewsDir.
       if (!path.isAbsolute(template))
         template = path.join(this.#options.viewsDir, template);
 
-      // If the template file cannot be found, an error is returned.
+      // Verify the template file exists before attempting compilation.
       if (!fs.existsSync(template))
-        return void rejetct(new TypeError(`Template not found (${template})`));
+        return void reject(new TypeError(`Template not found (${template})`));
 
-      // Execute compilation.
-      this.#render(template, {
+      // Execute the express-hbs rendering engine.
+      this.#engine(template, {
         settings: {views: undefined},
         cache: false,
         ...data,
       }, (error: any, html: string) => {
         if (error)
-          return void rejetct(error);
+          return void reject(error);
         resolve(html);
       });
     });
   }
 
   /**
-   * Initialize options.
+   * Merges user-provided options with default values.
+   * Sets default paths for partialsDir, layoutsDir, and defaultLayout based on viewsDir
+   * when they are not explicitly specified.
    *
-   * @param {CompilerOptions} options Compilation options.
-   * @return {Required<CompilerOptions>}  Options with all optional items set.
+   * @param {CompilerOptions} options User-provided compilation options.
+   * @return {Required<CompilerOptions>} Fully resolved options with all defaults applied.
    */
-  #initOptions(options: CompilerOptions): Required<CompilerOptions> {
-    // Initialize options.
-    options = merge({
-      viewsDir: undefined,
+  #applyDefaults(options: CompilerOptions): Required<CompilerOptions> {
+    options = {
       partialsDir: undefined,
       layoutsDir: undefined,
       defaultLayout: undefined,
@@ -118,46 +141,44 @@ export default class {
       contentHelperName: 'contentFor',
       blockHelperName: 'block',
       helpers: undefined,
-    }, options);
+      ...options,
+    };
 
-    // If no partial directory is specified, the default value is set.
+    // Default partialsDir to <viewsDir>/partials.
     if (!options.partialsDir)
       options.partialsDir = path.join(options.viewsDir, 'partials');
 
-    // If no layout directory is specified, the default value is set.
+    // Default layoutsDir to <viewsDir>/layout.
     if (!options.layoutsDir)
       options.layoutsDir = path.join(options.viewsDir, 'layout');
 
-    // If no default layout file is specified, the default value is set.
+    // Default defaultLayout to <layoutsDir>/default.hbs.
     if (!options.defaultLayout)
       options.defaultLayout = path.join(options.layoutsDir, 'default.hbs');
+
     return options as Required<CompilerOptions>;
   }
 
   /**
-   * Validate options.
+   * Validates that all directories and files referenced in the options exist on the filesystem.
    *
-   * @param {CompilerOptions} options Compilation options.
-   * @throws {TypeError} Throws an exception if the directory specified by the viewsDir option is not found.
-   * @throws {TypeError} Throws an exception if the directory specified by the partialsDir option is not found.
-   * @throws {TypeError} Throws an exception if the directory specified by the layoutsDir option is not found.
-   * @throws {TypeError} Throws an exception if the file specified by the defaultLayout option is not found.
+   * @param {Required<CompilerOptions>} options Fully resolved compilation options.
+   * @throws {TypeError} If the viewsDir directory does not exist.
+   * @throws {TypeError} If any partialsDir directory does not exist.
+   * @throws {TypeError} If the layoutsDir directory does not exist.
+   * @throws {TypeError} If the defaultLayout file does not exist.
    */
   #validateOptions(options: Required<CompilerOptions>) {
-    // If the view directory is not found, return an error.
     if (!fs.existsSync(options.viewsDir))
       throw new TypeError(`View directory not found (${options.viewsDir})`);
 
-    // If the partial directory is not found, return an error.
     for (let partialsDir of Array.isArray(options.partialsDir) ? options.partialsDir : [options.partialsDir])
       if (!fs.existsSync(partialsDir))
         throw new TypeError(`Partial directory not found (${partialsDir})`);
 
-    // If the layout directory is not found, return an error.
     if (!fs.existsSync(options.layoutsDir))
       throw new TypeError(`Layout directory not found (${options.layoutsDir})`);
 
-    // If the default layout file is not found, return an error.
     if (!fs.existsSync(options.defaultLayout))
       throw new TypeError(`Default layout file not found (${options.defaultLayout})`);
   }

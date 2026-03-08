@@ -1,6 +1,18 @@
+# Dependencies
 node_modules/
+
+# IDE
 .vscode/
+
+# AI assistant
+.claude/
+
+# Tests
 __tests__/
+
+# Source (distributed as compiled bundles)
 src/
+
+# Build configuration
 rollup.config.js
 tsconfig.json

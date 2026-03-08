@@ -1,92 +1,130 @@
 # express-hbs-compile
-Get HTML string compiled by express-hbs.  
-Click [here](CHANGELOG.md) to see the change log.
+
+Compile Handlebars templates into HTML strings, powered by [express-hbs](https://github.com/barc/express-hbs).
 
 ## Installation
+
 ```sh
-npm install --save express-hbs-compile
+npm install express-hbs-compile
 ```
+
+## Quick Start
+
+Import the package and call `compile()` with the path to your template directory.
+This returns an async `render` function that compiles a Handlebars template into an HTML string.
+
+```js
+import path from 'path';
+import compile from 'express-hbs-compile';
+
+// 1. Create a render function by specifying where your templates live.
+const render = compile({
+  viewsDir: path.join(import.meta.dirname, 'views'),
+});
+
+// 2. Render a template with data — returns a Promise<string>.
+const html = await render('index.hbs', {title: 'Home'});
+console.log(html); // => compiled HTML string
+```
+
+> **Note:** `import.meta.dirname` requires Node 20.11+. For older versions, use `__dirname` (CommonJS) or `dirname(fileURLToPath(import.meta.url))` (ESM).
+>
+> CommonJS is also supported: `const compile = require('express-hbs-compile');`
 
 ## API
-### `hbs()`
-Create render function with options.
+
+### `compile(options)`
+
+Creates a render function bound to the given options.
+All paths except `viewsDir` have sensible defaults and are optional.
 
 ```js
-const hbs = require('express-hbs-compile');
-
-const render = hbs({
-  viewsDir: path.join(__dirname, 'views'),
-  partialsDir: path.join(__dirname, 'views/partials'),
-  layoutsDir: path.join(__dirname, 'views/layout'),
-  defaultLayout: path.join(__dirname, 'views/layout/default.hbs'),
+const render = compile({
+  viewsDir: path.join(import.meta.dirname, 'views'),
+  partialsDir: path.join(import.meta.dirname, 'views/partials'),
+  layoutsDir: path.join(import.meta.dirname, 'views/layout'),
+  defaultLayout: path.join(import.meta.dirname, 'views/layout/default.hbs'),
   extname: '.hbs',
-  contentHelperName: 'contentFor',
-  blockHelperName: 'block',
-  // helpers: {
-  //   sayhello: name => `Hello, ${name}`,
-  // }
+  helpers: {
+    shout: str => str.toUpperCase() + '!',
+  },
 });
 ```
 
-#### Parameters
-- {string} <code>viewsDir</code> The absolute directory path of the template. This option is required.
-- {string|string[]} <code>partialsDir?</code> Directory absolute path of the partial template. One or more directories can be set. Default is &quot;path.join(options.viewsDir, &#039;partials&#039;)&quot;.
-- {string} <code>layoutsDir?</code> Directory absolute path of the layout template. Default is &quot;path.join(options.viewsDir, &#039;layout&#039;)&quot;.
-- {string} <code>defaultLayout?</code> Absolute path of the default layout file. Default is &quot;path.join(options.layoutsDir, &#039;default.hbs&#039;)&quot;.
-- {string} <code>extname?</code> Extension for layout and partial templates. Default is `.hbs`&quot;.
-- {string} <code>contentHelperName?</code> Override the &#039;contentFor&#039; helper name used in the template.
-- {string} <code>blockHelperName?</code> Override the &#039;block&#039; helper name used in the template.
-- {{[key: string]: Handlebars.HelperDelegate}} <code>helpers</code> A helper accessible from the template. The key is the helper name and the value is the object that will be the helper function.
+#### Options
 
-#### Return value
-{(filePath: string, data?: object) =&gt; Promise&lt;string&gt;} Returns the render function.
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `viewsDir` | `string` | Yes | | Absolute path to the template directory. |
+| `partialsDir` | `string \| string[]` | No | `<viewsDir>/partials` | Absolute path(s) to partial template directories. |
+| `layoutsDir` | `string` | No | `<viewsDir>/layout` | Absolute path to the layout template directory. |
+| `defaultLayout` | `string` | No | `<layoutsDir>/default.hbs` | Absolute path to the default layout file. |
+| `extname` | `string` | No | `.hbs` | File extension for templates. |
+| `contentHelperName` | `string` | No | `contentFor` | Name of the content block helper. |
+| `blockHelperName` | `string` | No | `block` | Name of the block rendering helper. |
+| `helpers` | `{[name: string]: Function}` | No | | Custom Handlebars helpers to register. |
 
-#### Exceptions
-- {TypeError} Throws an exception if the viewsDir option is unset.
-- {TypeError} Throws an exception if the directory specified by the viewsDir option is not found.
-- {TypeError} Throws an exception if the directory specified by the partialsDir option is not found.
-- {TypeError} Throws an exception if the directory specified by the layoutsDir option is not found.
-- {TypeError} Throws an exception if the file specified by the defaultLayout option is not found.
+#### Returns
 
-### `render()`
-Receive the result of compiling the template as a string.  
-**The handlebars used internally are extended and can use custom helpers found [here](https://takuya-motoshima.github.io/handlebars-extd/).**
+`(template: string, data?: object) => Promise<string>` — an async render function.
+
+#### Throws
+
+- `TypeError` — if `viewsDir` is not provided.
+- `TypeError` — if any specified directory or file does not exist.
+
+### `render(template, data?)`
+
+The function returned by `compile()`. Compiles a template and returns the resulting HTML string.
 
 ```js
-const hbs = require('express-hbs-compile');
+// Relative path (resolved from viewsDir)
+const html = await render('user/profile.hbs', {username: 'John'});
 
-const render = hbs({
-  viewsDir: path.join(__dirname, 'views'),
+// Absolute path also works
+const welcome = await render(path.join(import.meta.dirname, 'views/email/welcome.hbs'), {
+  recipientName: 'John',
 });
-
-// Compile template.
-const html = await render('index.hbs', {name: 'foo'});
 ```
 
 #### Parameters
-- {string} <code>template</code> File name or absolute path of the template. If only the file name is specified, the template is searched from the directory specified by the viewsDir option.
-- {object} <code>data?</code> Objects to be expanded on the template. settings, cache, and layout are reserved words and cannot be used as key names for data.
 
-#### Return value
-{Promise&lt;string&gt;} Compiled HTML string.
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `template` | `string` | Yes | File name or absolute path to the template. Relative names are resolved from `viewsDir`. |
+| `data` | `object` | No | Data passed to the template. `settings`, `cache`, and `layout` are reserved keys. |
 
-#### Exceptions
-- {TypeError} Throws an exception if any of the data keys contain reserved words (settings, cache, layout).
-- {TypeError} Throws an exception if the template file cannot be found.
+#### Returns
 
-## Testing
-With [npm](http://npmjs.org) do:
+`Promise<string>` — the compiled HTML string.
 
-```sh
-npm test
+#### Throws
+
+- `TypeError` — if the template file does not exist.
+- `TypeError` — if `data` contains a reserved key (`settings`, `cache`, or `layout`).
+
+## Built-in Helpers
+
+The internal Handlebars instance is extended with [handlebars-extd](https://shumatsumonobu.github.io/handlebars-extd/), which provides additional helpers like `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, and more.
+
+```hbs
+{{#if (eq role 'admin')}}
+  <span>Admin</span>
+{{/if}}
 ```
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## Author
-**Takuya Motoshima**
 
-* [github/takuya-motoshima](https://github.com/takuya-motoshima)
-* [twitter/TakuyaMotoshima](https://twitter.com/TakuyaMotoshima)
-* [facebook/takuya.motoshima.7](https://www.facebook.com/takuya.motoshima.7)
+**shumatsumonobu**
+
+- [github/shumatsumonobu](https://github.com/shumatsumonobu)
+- [x/shumatsumonobu](https://x.com/shumatsumonobu)
+- [facebook/takuya.motoshima.7](https://www.facebook.com/takuya.motoshima.7)
 
 ## License
+
 [MIT](LICENSE)
